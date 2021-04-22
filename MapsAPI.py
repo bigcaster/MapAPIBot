@@ -18,13 +18,12 @@ geocoder_params = {
 places_params = {
     "lang": "ru_RU",
     "apikey": "575a0baa-461e-472c-8be2-bb4234d97a53",
-    "format": "json"
 }
-format_keys = {"geocode": "geocode", "location": "geocode", "геокод": "geocode", "локация": "geocode", "l": "l",
-               "layer": "l", "слой": "l", "z": "z", "zoom": "z", "масштаб": "z", "scale": "scale",
-               "увеличение": "scale", "pt": "pt", "mark": "pt", "метка": "pt", "kind": "kind", "toponym": "kind",
-               "топоним": "kind", "text": "text", "search": "text", "place": "text", "поиск": "text", "место": "text",
-               "results": "results", "результаты": "results", "trf": "trf", "traffic": "trf", "траффик": "trf"
+format_keys = {"geocode": "geocode", "геокод": "geocode", "l": "l", "layer": "l", "слой": "l", "z": "z", "zoom": "z",
+               "масштаб": "z", "scale": "scale", "увеличение": "scale", "pt": "pt", "marker": "pt", "метка": "pt",
+               "kind": "kind", "toponym": "kind", "топоним": "kind", "text": "text", "search": "text", "place": "text",
+               "поиск": "text", "место": "text", "results": "results", "результаты": "results", "trf": "trf",
+               "traffic": "trf", "траффик": "trf"
                }
 format_values = {"sat": "sat", "satellite": "sat", "спутник": "sat", "map": "map", "схема": "map", "sat,skl": "sat,skl",
                  "sat,map": "sat,skl", "hybrid": "sat,skl", "гибрид": "sat,skl", "house": "house", "дом": "house",
@@ -32,7 +31,7 @@ format_values = {"sat": "sat", "satellite": "sat", "спутник": "sat", "map
                  "район": "district", "locality": "locality", "пункт": "locality"
                  }
 
-mes = "geocode=Австрия;лишний=параметр;layer=map;результаты=10".lower().split(';')
+mes = "geocode=Арбат, москва;лишний=параметр;результаты=5;топоним=метро;метка=bl,m".lower().split(';')
 
 
 def map_api(message):
@@ -99,6 +98,8 @@ Http статус: {geocode_response.status_code} ({geocode_response.reason})"""
                     value = format_values[value]
                 else:
                     return "ERROR: неверное значение параметра l"
+            elif key == "pt":
+                pass
             elif key == "z" and not (value.isdigit() and 0 <= int(value) <= 17):
                 return "ERROR: неверное значение параметра z"
             elif key == "scale" and not (value.isdigit() and 1 <= float(value) <= 4):
@@ -106,13 +107,23 @@ Http статус: {geocode_response.status_code} ({geocode_response.reason})"""
             static_params[key] = value
     if "z" not in static_params:
         static_params["spn"] = spn
+    if "pt" in message_params:
+        marker_definition = message_params.get("pt").split(',')
+        if len(marker_definition) != 2:
+            return "ERROR: неправильное количество аргументов в параметре метки"
+        marker_color, marker_size = marker_definition
+        if not (marker_color in ["wt", "do", "db", "bl", "gn", "dg", "gr", "lb", "nt", "or", "pn", "rd", "vv", "yw",
+                                 "org", "dir", "bylw"] and marker_size in ["m", "l"]):
+            return "ERROR: неправильное значение аргументов в параметре метки"
+    else:
+        marker_color, marker_size = "dir", "m"
     if toponym_poses:
-        for toponym_pos in toponym_poses:
-            static_params["pt"] = static_params.get("pt", "") + ",".join(toponym_pos.split()) + ",pm2rdm~"
-        static_params["pt"] = static_params["pt"][:-1]
+        static_params["pt"] = '~'.join(
+            [",".join(toponym_pos.split()) + f",pm2{marker_color}{marker_size}" for toponym_pos in toponym_poses])
     else:
         static_params["ll"] = pos
-
+        if "pt" in message_params:
+            static_params["pt"] = f"{pos},pm2{marker_color}{marker_size}"
     static_response = requests.get(static_api_server, params=static_params)
     if not static_response:
         return f"""Ошибка запроса: {static_api_server}
