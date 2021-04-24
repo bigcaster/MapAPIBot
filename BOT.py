@@ -1,6 +1,8 @@
 import telebot
 from bs4 import BeautifulSoup
 import requests
+from datetime import datetime
+from pycbrf import ExchangeRates
 
 url = 'http://api.openweathermap.org/data/2.5/weather'
 api_weather = 'e4a3da131fe7dd1aa4d06d1ded5c6963'
@@ -27,9 +29,30 @@ def news(message):
     soup = BeautifulSoup(response.content, 'html.parser')
     texts = soup.findAll('a', 'list-item__title')
 
-    for i in range(len(texts[:-14]), -1, -1):
+    for i in range(len(texts[:-16]), -1, -1):
         txt = str(i + 1) + ') ' + texts[i].text
         bot.send_message(message.chat.id, '<a href="{}">{}</a>'.format(texts[i]['href'], txt), parse_mode='html')
+
+
+@bot.message_handler(commands=['currency'])
+def currency(message):
+    markup = telebot.types.ReplyKeyboardMarkup(row_width=4)
+    item1 = telebot.types.KeyboardButton('USD')
+    item2 = telebot.types.KeyboardButton('EUR')
+    markup.add(item1, item2)
+    bot.send_message(chat_id=message.chat.id, text="<b>Какой курс валюты вас интересует?</b>", reply_markup=markup,
+                     parse_mode="html")
+    bot.register_next_step_handler(message, exchange_rate)
+
+
+@bot.message_handler(content_types=['USD', 'EUR'])
+def exchange_rate(message):
+    message_norm = message.text.strip().lower()
+    if message_norm in ['usd', 'eur']:
+        rates = ExchangeRates(datetime.now())
+        bot.send_message(chat_id=message.chat.id,
+                         text=f"<b>Сейчас курс: {message_norm.upper()} = {float(rates[message_norm.upper()].rate)}</b>",
+                         parse_mode="html")
 
 
 @bot.message_handler(commands=['weather'])
