@@ -201,7 +201,7 @@ Http статус: {places_response.status_code} ({places_response.reason})"""
         marker_color, marker_size = marker_definition
         if marker_color not in ["wt", "do", "db", "bl", "gn", "dg", "gr", "lb", "nt", "or", "pn", "rd", "vv", "yw",
                                 "org", "dir", "bylw"] or marker_size not in ["m", "l"]:
-            return "Неправильное значение аргументов в параметре метки"
+            return "Неправильное значение аргументов в описании метки"
         return marker_color, marker_size
 
     def show_image(self, content):
