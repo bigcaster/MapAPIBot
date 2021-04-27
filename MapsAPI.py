@@ -1,31 +1,25 @@
-import os
 import requests
-from PIL import Image
 from serversAndParams import static_api_server, geocode_api_server, places_api_server
 from serversAndParams import static_params, geocoder_params, places_params, format_keys, format_values
 
-mes = "geocode=Москва;лишний=параметр;l=map;kind=locality;results=2".lower().split(';')
-
 
 class MapAPI:
-    def __init__(self, message):
-        self.message = message
+    def __init__(self):
+        self.message = None
         self.message_params = {}
         self.static_params = static_params
         self.geocoder_params = geocoder_params
         self.places_params = places_params
         self.kind_param = None
-        output = self.main()
-        if output is not None:
-            print(output)
 
-    def main(self):
+    def main(self, message):
+        self.message = message.lower().split(';')
         self.message_params = {}
         for param in self.message:
             if '=' in param:
                 param_list = list((map(str.strip, param.split('='))))
                 if len(param_list) != 2:
-                    return "Ошибка в инициализации параметра"
+                    return "Ошибка инициализации параметра"
                 key, value = param_list
                 if key in format_keys:
                     right_key = format_keys[key]
@@ -37,11 +31,11 @@ class MapAPI:
         text_param = "text" in self.message_params
         self.kind_param = "kind" in self.message_params
         if not geocode_param and not text_param:
-            return "ERROR: отсутствует обязательный параметр"
+            return 'Отсутствует обязательный параметр ("geocode" или "text")'
         elif geocode_param and text_param:
-            return "ERROR: параметры text и geocode в запросе"
+            return 'Параметры "geocode" и "text" в одном запросе'
         elif text_param and self.kind_param:
-            return "ERROR: параметры text и kind в запросе"
+            return 'Параметры "text" и "kind" в одном запросе'
 
         for key, value in self.message_params.items():
             if key in ["l", "z", "scale", "pt", "trf"]:
@@ -49,11 +43,11 @@ class MapAPI:
                     if value in format_values:
                         value = format_values[value]
                     else:
-                        return "Неверное значение параметра l"
+                        return 'Неверное аргумент в параметре "l"'
                 elif key == "z" and not (value.isdigit() and 0 <= int(value) <= 17):
-                    return "Неверное значение параметра z"
+                    return 'Неверное аргумент в параметре "z"'
                 elif key == "scale" and not (value.isdigit() and 1 <= float(value) <= 4):
-                    return "Неверное значение параметра scale"
+                    return 'Неверное аргумент в параметре "scale"'
                 self.static_params[key] = value
 
         if geocode_param:
@@ -67,7 +61,7 @@ class MapAPI:
             return f"""Ошибка в запросе: {static_api_server}
 Http статус: {static_response.status_code} ({static_response.reason})"""
 
-        self.show_image(static_response.content)
+        self.make_image(static_response.content)
 
     def geocode_request(self):
         for key, value in self.message_params.items():
@@ -76,7 +70,7 @@ Http статус: {static_response.status_code} ({static_response.reason})"""
                     if value in format_values:
                         value = format_values[value]
                     else:
-                        return "ERROR: недопустимое значение параметра kind"
+                        return 'Недопустимый аргумент в параметре "kind"'
                 self.geocoder_params[key] = value
 
         geocode_response = requests.get(geocode_api_server, params=self.geocoder_params)
@@ -101,9 +95,9 @@ Http статус: {static_response.status_code} ({static_response.reason})"""
                     info = {"spn": spn, "pos": pos, "address": address}
                     objects.append(info)
         except Exception:
-            return "Произошла ошибка во время обработки запроса"
+            return "Произошла ошибка во время поиска объектов"
         if not objects and not self.kind_param:
-            return "Не удалось найти объекты"
+            return "Не удалось найти объекты по вашему запросу"
         init_marker_params_output = self.init_marker_params()
         if len(init_marker_params_output) == 1:
             return init_marker_params_output
@@ -117,11 +111,13 @@ Http статус: {static_response.status_code} ({static_response.reason})"""
                 [f"{','.join(toponym['pos'].split())},pm2{marker_color}{marker_size}" for toponym in toponyms])
             if "z" not in static_params:
                 static_params["spn"] = max(toponym["spn"] for toponym in toponyms)
+            return toponyms
         else:
             self.static_params["pt"] = '~'.join(
                 [f"{geo_object['pos']},pm2{marker_color}{marker_size}" for geo_object in objects])
             if "z" not in self.static_params:
                 self.static_params["spn"] = max(geo_object["spn"] for geo_object in objects)
+            return objects
 
     def text_request(self):
         for key, value in self.message_params.items():
@@ -164,7 +160,7 @@ Http статус: {places_response.status_code} ({places_response.reason})"""
                                                                                                "Не найден")
             features.append(info)
         if not features:
-            return "Не удалось получить описание организаций"
+            return "Не удалось получить информацию по организациям"
         init_marker_params_output = self.init_marker_params()
         if isinstance(init_marker_params_output, str):
             return init_marker_params_output
@@ -189,29 +185,26 @@ Http статус: {places_response.status_code} ({places_response.reason})"""
                         "address": member["GeoObject"]["description"], "spn": spn}
                 toponyms.append(info)
         except Exception:
-            return "Произошла ошибка во время обработки топонимов"
+            return "Произошла ошибка во время поиска топонимов по вашему запросу"
         if not toponyms:
-            return "Не удалось получить описание топонимов"
+            return "Не удалось найти информацию о топонимах"
         return toponyms
 
     def init_marker_params(self):
         marker_definition = self.message_params.get("pt", "nt,m").split(',')
         if len(marker_definition) != 2:
-            return "Неверное количество параметров в описании метки"
+            return "Неверное количество аргументов в параметре метки"
         marker_color, marker_size = marker_definition
         if marker_color not in ["wt", "do", "db", "bl", "gn", "dg", "gr", "lb", "nt", "or", "pn", "rd", "vv", "yw",
                                 "org", "dir", "bylw"] or marker_size not in ["m", "l"]:
-            return "Неправильное значение аргументов в описании метки"
+            return "Недопустимое значение аргументов в параметре метки"
         return marker_color, marker_size
 
-    def show_image(self, content):
+    def make_image(self, content):
         map_file = "map.png"
         with open(map_file, 'wb') as file:
             file.write(content)
-        im = Image.open(map_file)
-        im.show()
-        os.remove(map_file)
 
 
 if __name__ == '__main__':
-    map_api = MapAPI(mes)
+    map_api = MapAPI()
