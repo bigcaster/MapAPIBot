@@ -78,7 +78,6 @@ def exchange_rate(message):
                          parse_mode="html")
     else:
         bot.send_message(message.chat.id, f'Такой курс валюты: {message_norm.upper()} не найден')
-    bot.register_next_step_handler(message)
 
 
 @bot.message_handler(commands=['weather'])
