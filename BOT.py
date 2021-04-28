@@ -15,7 +15,14 @@ bot = telebot.TeleBot(api_telegram)
 def send_welcome(message):
     bot.send_message(message.chat.id, 'Добро пожаловать, ' + str(message.from_user.first_name) + '!' + '\n' +
                      'Чем вам помочь?')
-    bot.register_next_step_handler(message)
+
+
+@bot.message_handler(commands=['help'])
+def help(message):
+    bot.send_message(message.chat.id,
+                     '/start запуск бота\n/help команды бота\n/weather узнать погоду' + '\n' +
+                     '/news узнать сегодняшние новости' + '\n' + '/currency курс валют' + '\n' +
+                     '/map карты')
 
 
 @bot.message_handler(commands=['news'])
@@ -34,30 +41,49 @@ def news(message):
         bot.send_message(message.chat.id, '<a href="{}">{}</a>'.format(texts[i]['href'], txt), parse_mode='html')
 
 
+@bot.message_handler(commands=['map'])
+def map(message):
+    bot.send_message(message.chat.id, 'Что вас интересует?')
+    bot.register_next_step_handler(message)
+    map_file = "map.png"
+    with open(map_file, 'wb') as file:
+        file.write(content)
+
+    if not geocode_response:
+        return f"Ошибка запроса: {geocode_api_server}"
+    else:
+        return geocode_request
+
+
 @bot.message_handler(commands=['currency'])
 def currency(message):
-    markup = telebot.types.ReplyKeyboardMarkup(row_width=4)
-    item1 = telebot.types.KeyboardButton('USD')
+    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1 = telebot.types.KeyboardButton('GBP')
     item2 = telebot.types.KeyboardButton('EUR')
-    markup.add(item1, item2)
+    item3 = telebot.types.KeyboardButton('CNY')
+    item4 = telebot.types.KeyboardButton('USD')
+    markup.add(item1, item2, item3, item4)
     bot.send_message(chat_id=message.chat.id, text="<b>Какой курс валюты вас интересует?</b>", reply_markup=markup,
                      parse_mode="html")
     bot.register_next_step_handler(message, exchange_rate)
 
 
-@bot.message_handler(content_types=['USD', 'EUR'])
+@bot.message_handler(content_types=['USD', 'EUR', 'CNY', 'GBP'])
 def exchange_rate(message):
     message_norm = message.text.strip().lower()
-    if message_norm in ['usd', 'eur']:
+    if message_norm in ['usd', 'eur', 'cny', 'gbp']:
         rates = ExchangeRates(datetime.now())
         bot.send_message(chat_id=message.chat.id,
                          text=f"<b>Сейчас курс: {message_norm.upper()} = {float(rates[message_norm.upper()].rate)}</b>",
                          parse_mode="html")
+    else:
+        bot.send_message(message.chat.id, f'Такой курс валюты: {message_norm.upper()} не найден')
+    bot.register_next_step_handler(message)
 
 
 @bot.message_handler(commands=['weather'])
 def weather(message):
-    bot.send_message(message.chat.id, 'чтоб узнать погоду напишите в чат название города')
+    bot.send_message(message.chat.id, 'Чтобы узнать погоду напишите в чат название города')
     bot.register_next_step_handler(message, test)
 
 
@@ -70,11 +96,14 @@ def test(message):
         result = requests.get(url, params=params)
         weather = result.json()
 
-        bot.send_message(message.chat.id, "В городе " + str(weather["name"]) + " температура " + str(
-            float(weather["main"]['temp'])) + "\n" +
-                         "Скорость ветра " + str(float(weather['wind']['speed'])) + "\n" +
-                         "Влажность " + str(int(weather['main']['humidity'])) + "%" + "\n" +
-                         "Описание " + str(weather['weather'][0]["description"]) + "\n\n")
+        bot.send_message(message.chat.id, "В городе " + str(weather["name"]) + " температура: " + str(
+            int(weather["main"]['temp'])) + "\n" +
+                         "Минимальная температура: " + str(float(weather['main']['temp_min'])) + "\n" +
+                         "Скорость ветра: " + str(float(weather['wind']['speed'])) + "\n" +
+                         "Давление: " + str(float(weather['main']['pressure'])) + "\n" +
+                         "Влажность: " + str(int(weather['main']['humidity'])) + "%" + "\n" +
+                         "Видимость: " + str(weather['visibility']) + "\n" +
+                         "Описание: " + str(weather['weather'][0]["description"]) + "\n")
 
     except:
         bot.send_message(message.chat.id, "Город " + city_name + " не найден")
