@@ -41,18 +41,9 @@ def news(message):
         bot.send_message(message.chat.id, '<a href="{}">{}</a>'.format(texts[i]['href'], txt), parse_mode='html')
 
 
-@bot.message_handler(commands=['map'])
+"""@bot.message_handler(commands=['map'])
 def map(message):
-    bot.send_message(message.chat.id, 'Что вас интересует?')
-    bot.register_next_step_handler(message)
-    map_file = "map.png"
-    with open(map_file, 'wb') as file:
-        file.write(content)
-
-    if not geocode_response:
-        return f"Ошибка запроса: {geocode_api_server}"
-    else:
-        return geocode_request
+    Image.open("map.png")"""
 
 
 @bot.message_handler(commands=['currency'])
@@ -68,7 +59,7 @@ def currency(message):
     bot.register_next_step_handler(message, exchange_rate)
 
 
-@bot.message_handler(content_types=['USD', 'EUR', 'CNY', 'GBP'])
+@bot.message_handler(content_types=['USD', 'EUR', 'CNY', 'GBP', "exit"])
 def exchange_rate(message):
     message_norm = message.text.strip().lower()
     if message_norm in ['usd', 'eur', 'cny', 'gbp']:
@@ -76,8 +67,12 @@ def exchange_rate(message):
         bot.send_message(chat_id=message.chat.id,
                          text=f"<b>Сейчас курс: {message_norm.upper()} = {float(rates[message_norm.upper()].rate)}</b>",
                          parse_mode="html")
+        bot.register_next_step_handler(message, exchange_rate)
+    elif message_norm == "exit":
+        bot.register_next_step_handler(message)
     else:
         bot.send_message(message.chat.id, f'Такой курс валюты: {message_norm.upper()} не найден')
+
 
 
 @bot.message_handler(commands=['weather'])
